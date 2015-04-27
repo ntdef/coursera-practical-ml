@@ -1,0 +1,98 @@
+---
+title: "Predicting Exercise Performance"
+author: "N. Troy de Freitas"
+date: "April 25th, 2015"
+---
+
+
+```{r setup, include=FALSE}
+library(knitr)
+```
+
+# Predicting Exercise Quality with Random Forest
+## Introduction
+The goal of this report is to show how Random Forest can be applied to accurately predict weightlifiting 
+quality in participants from the Weightlifting Exercise Dataset. To build my model, I created a testing
+and training partition of the data and trained a Random Forest and a Naive Bayes on the training data.
+I chose Random Forest because of its winning track record in Kaggle competitions and used Naive Bayes
+as a benchmark because of its simplicity and assumption of independenc of the features, which seemed
+valid for this dataset where all of the components are indpendent vectors.
+I used Bootstraping to cross-validate my model for both the Naive Bayes and
+the Random Forest model. I expect my out of sample error for the Random Forest model to be bounded 
+between 0.85 and 0.95, just under
+the restulst of my training model
+The results showed that Random Forest strongly outperformed the Naive Bayes model, although Random Forest
+took much longer to train.
+
+What follows is the code used in my study.
+
+## Setup
+```{r }
+library(caret)
+library(ggplot2)
+library(Hmisc)
+set.seed(1337)
+
+data <- read.csv("~/Documents/data-science/coursera//pml-training.csv")
+```
+
+## Cleaning the Data
+For this data set, I chose to only use the raw features to avoid multi-collinearity in my features
+since variance, average, max, etc are all functions of the data. In addition, these were the only features with NAs.
+
+```{r echo=FALSE}
+features <- names(data)[!grepl("^X|var|new|timestamp|amplitude|avg|kurtosis|skewness|max|min|stddev", names(data))]
+subset <- data[,features]
+```
+
+## Cross-Validation Splitting
+I split the data into a 60% training and 40% testing.
+
+```{r echo=FALSE}
+train.idx <- createDataPartition(subset$classe, p=0.6, list=F)
+training <- subset[train.idx,]
+testing  <- subset[-train.idx,]
+```
+
+
+Here, I train my model with both Random Forest and Naive Bayes, pre-processing first by centering
+and scaling and deriving the principal components.
+
+```{r eacho=TRUE}
+library(randomForest)
+library(e1071)
+X_train <- subset(training,select=-c(classe))
+y_train <- training$classe
+rf_model <- randomForest(X_train, y_train)
+nb_model <- naiveBayes(X_train, y_train)
+```
+
+Once I derived my model, I predict results on the test set.
+
+```{r echo=TRUE, cahche=TRUE}
+rf_pred <- predict(rf_model, testing)
+nb_pred <- predict(nb_model, testing)
+rf_model
+```
+
+I defined a function to evaludate my prediciton accuracy.
+
+```{r echo=TRUE}
+accuracy  <- function(prediction) {
+  return(sum(diag(prop.table(table(prediction, testing$classe)))))
+}
+ 
+rf_acc <- accuracy(rf_pred)
+nb_acc <- accuracy(nb_pred)
+```
+
+The Random Forest model vastly out-performed the Naive Bayes. As you can see, the accuracy of the Naive Bayes model was `r nb_acc`, whereas the Random Forest model was `r rf_acc`. 
+
+
+The following are my final results 
+```{r echo=TRUE}
+final.test <- read.csv("~/Documents/data-science/coursera/pml-testing.csv")
+final.results <- predict(rf_model, subset(final.test, select=features[-length(features)]))
+summary(final.results)
+```
+
